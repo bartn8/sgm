@@ -37,12 +37,28 @@ static uint8_t *d_L5;
 static uint8_t *d_L6;
 static uint8_t *d_L7;
 
-static uint16_t *h_idsi;
-static uint8_t *h_disparity;
-
 static uint8_t p1, p2;
 static bool first_alloc;
 static uint32_t cols, rows, size, size_cube_l;
+
+static void free_memory() {
+	CUDA_CHECK_RETURN(cudaFree(d_transform0));
+	CUDA_CHECK_RETURN(cudaFree(d_transform1));
+	CUDA_CHECK_RETURN(cudaFree(d_L0));
+	CUDA_CHECK_RETURN(cudaFree(d_L1));
+	CUDA_CHECK_RETURN(cudaFree(d_L2));
+	CUDA_CHECK_RETURN(cudaFree(d_L3));
+#if PATH_AGGREGATION == 8
+	CUDA_CHECK_RETURN(cudaFree(d_L4));
+	CUDA_CHECK_RETURN(cudaFree(d_L5));
+	CUDA_CHECK_RETURN(cudaFree(d_L6));
+	CUDA_CHECK_RETURN(cudaFree(d_L7));
+#endif
+	CUDA_CHECK_RETURN(cudaFree(d_disparity));
+	CUDA_CHECK_RETURN(cudaFree(d_disparity_filtered_uchar));
+	CUDA_CHECK_RETURN(cudaFree(d_cost));
+	CUDA_CHECK_RETURN(cudaFree(d_icost));
+}
 
 #if PATH_AGGREGATION == 8
 __global__ void addKernel(uint16_t* c, const uint8_t* d_L0, const uint8_t* d_L1, const uint8_t* d_L2, const uint8_t* d_L3, const uint8_t* d_L4, const uint8_t* d_L5, const uint8_t* d_L6, const uint8_t* d_L7, int size) {
@@ -76,7 +92,7 @@ void init_aggregate_method(const uint8_t _p1, const uint8_t _p2) {
     cols = 0;
 }
 
-aggregate_tuple compute_disparity_method(cost_t *left_ct, cost_t *right_ct, uint32_t h, uint32_t w, uint8_t *h_dsi, float *elapsed_time_ms) {
+void compute_aggregate_method(uint16_t *h_idsi, uint8_t *h_disparity, cost_t *left_ct, cost_t *right_ct, uint8_t *h_dsi, uint32_t h, uint32_t w, float *elapsed_time_ms) {
 	if(cols != w || rows != h) {
 		debug_log("WARNING: cols or rows are different");
 		if(!first_alloc) {
@@ -108,9 +124,6 @@ aggregate_tuple compute_disparity_method(cost_t *left_ct, cost_t *right_ct, uint
 
 		CUDA_CHECK_RETURN(cudaMalloc((void **)&d_disparity, sizeof(uint8_t)*size));
 		CUDA_CHECK_RETURN(cudaMalloc((void **)&d_disparity_filtered_uchar, sizeof(uint8_t)*size));
-
-        h_idsi = new uint16_t[size_cube_l];
-		h_disparity = new uint8_t[size];
 	}
 
 	debug_log("Copying ct and dsi to the GPU");
@@ -207,33 +220,6 @@ aggregate_tuple compute_disparity_method(cost_t *left_ct, cost_t *right_ct, uint
 	debug_log("Copying final disparity to CPU");
 	CUDA_CHECK_RETURN(cudaMemcpy(h_disparity, d_disparity_filtered_uchar, sizeof(uint8_t)*size, cudaMemcpyDeviceToHost));
     CUDA_CHECK_RETURN(cudaMemcpy(h_idsi, d_icost, sizeof(uint16_t)*size_cube_l, cudaMemcpyDeviceToHost));
-	
-    aggregate_tuple result;
-    result.idsi = h_idsi;
-    result.disp = h_disparity;
-
-	return result;
-}
-
-static void free_aggregate_memory() {
-	CUDA_CHECK_RETURN(cudaFree(d_transform0));
-	CUDA_CHECK_RETURN(cudaFree(d_transform1));
-	CUDA_CHECK_RETURN(cudaFree(d_L0));
-	CUDA_CHECK_RETURN(cudaFree(d_L1));
-	CUDA_CHECK_RETURN(cudaFree(d_L2));
-	CUDA_CHECK_RETURN(cudaFree(d_L3));
-#if PATH_AGGREGATION == 8
-	CUDA_CHECK_RETURN(cudaFree(d_L4));
-	CUDA_CHECK_RETURN(cudaFree(d_L5));
-	CUDA_CHECK_RETURN(cudaFree(d_L6));
-	CUDA_CHECK_RETURN(cudaFree(d_L7));
-#endif
-	CUDA_CHECK_RETURN(cudaFree(d_disparity));
-	CUDA_CHECK_RETURN(cudaFree(d_disparity_filtered_uchar));
-	CUDA_CHECK_RETURN(cudaFree(d_cost));
-
-    delete[] h_idsi;
-	delete[] h_disparity;
 }
 
 void finish_aggregate_method() {

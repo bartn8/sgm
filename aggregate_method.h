@@ -22,17 +22,10 @@
 #define AGGREGATE_METHOD_H_
 
 #include <stdint.h>
-#include <opencv2/opencv.hpp>
 #include "util.h"
 #include "configuration.h"
 #include "cost_aggregation.h"
 #include "debug.h"
-
-typedef struct aggregate_tuple_struct
-{
-    uint16_t *idsi;
-    uint8_t *disp;
-} aggregate_tuple;
 
 #if PATH_AGGREGATION == 8
 __global__ void addKernel(uint16_t* c, const uint8_t* d_L0, const uint8_t* d_L1, const uint8_t* d_L2, const uint8_t* d_L3, const uint8_t* d_L4, const uint8_t* d_L5, const uint8_t* d_L6, const uint8_t* d_L7, int size);
@@ -41,8 +34,7 @@ __global__ void addKernel(uint16_t* c, const uint8_t* d_L0, const uint8_t* d_L1,
 #endif
 
 void init_aggregate_method(const uint8_t _p1, const uint8_t _p2);
-aggregate_tuple compute_aggregate_method(cost_t *left_ct, cost_t *right_ct, uint32_t h, uint32_t w, uint8_t *h_dsi, float *elapsed_time_ms);
+void compute_aggregate_method(uint16_t *h_idsi, uint8_t *h_disparity, cost_t *left_ct, cost_t *right_ct, uint8_t *h_dsi, uint32_t h, uint32_t w, float *elapsed_time_ms);
 void finish_aggregate_method();
-static void free_aggregate_memory();
 
 #endif /* AGGREGATE_METHOD_H_ */

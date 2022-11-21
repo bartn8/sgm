@@ -26,9 +26,17 @@ static uint8_t *d_im1;
 static cost_t *d_transform0;
 static cost_t *d_transform1;
 static uint8_t *d_cost;
-static uint8_t *h_dsi;
 static bool first_alloc;
 static uint32_t cols, rows, size, size_cube_l;
+
+
+static void free_memory() {
+	CUDA_CHECK_RETURN(cudaFree(d_im0));
+	CUDA_CHECK_RETURN(cudaFree(d_im1));
+	CUDA_CHECK_RETURN(cudaFree(d_transform0));
+	CUDA_CHECK_RETURN(cudaFree(d_transform1));
+	CUDA_CHECK_RETURN(cudaFree(d_cost));
+}
 
 void init_dsi_method() {
 	// We are not using shared memory, use L1
@@ -42,30 +50,27 @@ void init_dsi_method() {
     cols = 0;
 }
 
-uint8_t* compute_dsi_method(cv::Mat left, cv::Mat right, float *elapsed_time_ms) {
-	if(cols != left.cols || rows != left.rows) {
+void compute_dsi_method(uint8_t *h_dsi,  uint8_t *left_ct, uint8_t *right_ct, uint8_t *left, uint8_t *right, uint32_t h, uint32_t w, float *elapsed_time_ms) {
+	if(cols != w || rows != h) {
 		debug_log("WARNING: cols or rows are different");
 		if(!first_alloc) {
 			debug_log("Freeing memory");
 			free_memory();
 		}
 		first_alloc = false;
-		cols = left.cols;
-		rows = left.rows;
+		cols = w;
+		rows = h;
 		size = rows*cols;
 		size_cube_l = size*MAX_DISPARITY;
         
 		CUDA_CHECK_RETURN(cudaMalloc((void **)&d_transform0, sizeof(cost_t)*size));
 		CUDA_CHECK_RETURN(cudaMalloc((void **)&d_transform1, sizeof(cost_t)*size));
 		CUDA_CHECK_RETURN(cudaMalloc((void **)&d_cost, sizeof(uint8_t)*size_cube_l));
-
-
-		h_dsi = new uint8_t[size_cube_l];
 	}
 
 	debug_log("Copying images to the GPU");
-	CUDA_CHECK_RETURN(cudaMemcpyAsync(d_im0, left.ptr<uint8_t>(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice, stream1));
-	CUDA_CHECK_RETURN(cudaMemcpyAsync(d_im1, right.ptr<uint8_t>(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice, stream1));
+	CUDA_CHECK_RETURN(cudaMemcpyAsync(d_im0, left, sizeof(uint8_t)*size, cudaMemcpyHostToDevice, stream1));
+	CUDA_CHECK_RETURN(cudaMemcpyAsync(d_im1, right, sizeof(uint8_t)*size, cudaMemcpyHostToDevice, stream1));
 
 	cudaEvent_t start, stop;
 	cudaEventCreate(&start);
@@ -106,16 +111,8 @@ uint8_t* compute_dsi_method(cv::Mat left, cv::Mat right, float *elapsed_time_ms)
 
 	debug_log("Copying final dsi to CPU");
 	CUDA_CHECK_RETURN(cudaMemcpy(h_dsi, d_cost, sizeof(uint8_t)*size_cube_l, cudaMemcpyDeviceToHost));
-
-	return h_dsi;
-}
-
-static void free_dsi_memory() {
-	CUDA_CHECK_RETURN(cudaFree(d_im0));
-	CUDA_CHECK_RETURN(cudaFree(d_im1));
-	CUDA_CHECK_RETURN(cudaFree(d_transform0));
-	CUDA_CHECK_RETURN(cudaFree(d_transform1));
-	CUDA_CHECK_RETURN(cudaFree(d_cost));
+	CUDA_CHECK_RETURN(cudaMemcpy(left_ct, d_transform0, sizeof(uint8_t)*size, cudaMemcpyDeviceToHost));
+	CUDA_CHECK_RETURN(cudaMemcpy(right_ct, d_transform1, sizeof(uint8_t)*size, cudaMemcpyDeviceToHost));
 }
 
 void finish_dsi_method() {

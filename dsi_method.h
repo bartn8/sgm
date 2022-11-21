@@ -22,7 +22,6 @@
 #define DSI_METHOD_H_
 
 #include <stdint.h>
-#include <opencv2/opencv.hpp>
 #include "util.h"
 #include "configuration.h"
 #include "costs.h"
@@ -30,8 +29,7 @@
 #include "debug.h"
 
 void init_dsi_method();
-uint8_t* compute_dsi_method(cv::Mat left, cv::Mat right);
+void compute_dsi_method(uint8_t *h_dsi,  uint8_t *left_ct, uint8_t *right_ct, uint8_t *left, uint8_t *right, uint32_t h, uint32_t w, float *elapsed_time_ms);
 void finish_dsi_method();
-static void free_memory();
 
 #endif /* DSI_METHOD_H_ */
